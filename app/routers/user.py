@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 from backend.db_depends import get_db
 from typing import Annotated, List
-from models import User
+from models import User, Task
 from schemas import CreateUser, UpdateUser
-from sqlalchemy import insert, select, update, delete
+from sqlalchemy import select, insert, update, delete
 
 router = APIRouter(prefix='/user', tags=['user'])
 
@@ -54,6 +54,8 @@ async def update_user(user_id: int, user: UpdateUser, db: Annotated[Session, Dep
 
 @router.delete('/delete/{user_id}', status_code=status.HTTP_200_OK)
 async def delete_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
+    db.execute(delete(Task).where(Task.user_id == user_id))
+
     stmt = delete(User).where(User.id == user_id)
     result = db.execute(stmt)
     db.commit()
@@ -61,4 +63,9 @@ async def delete_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="User was not found")
 
-    return {'status_code': status.HTTP_200_OK, 'transaction': 'User deleted successfully!'}
+    return {'status_code': status.HTTP_200_OK, 'transaction': 'User and related tasks deleted successfully!'}
+
+@router.get('/{user_id}/tasks', response_model=List[Task])
+async def tasks_by_user_id(user_id: int, db: Annotated[Session, Depends(get_db)]):
+    tasks = db.execute(select(Task).where(Task.user_id == user_id)).scalars().all()
+    return tasks
